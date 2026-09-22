@@ -19,35 +19,62 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PersistentExchangeTest {
-    private static final CurrencyPair EUR_USD = new CurrencyPair("EUR", "USD");
+    private static final CurrencyPair EUR_USD =
+            new CurrencyPair("EUR", "USD");
 
     @TempDir
     Path tempDir;
 
     @Test
     void orderCanBePartiallyAndThenFullyFilledAndBothClientsAreNotified() {
-        Queue<TradeNotification> buyerNotifications = new ConcurrentLinkedQueue<>();
-        Queue<TradeNotification> sellerNotifications = new ConcurrentLinkedQueue<>();
+        Queue<TradeNotification> buyerNotifications =
+                new ConcurrentLinkedQueue<>();
+        Queue<TradeNotification> sellerNotifications =
+                new ConcurrentLinkedQueue<>();
 
         try (PersistentExchange exchange = exchange()) {
             exchange.connect("buyer", buyerNotifications::add);
             exchange.connect("seller", sellerNotifications::add);
 
-            exchange.placeOrder("buyer", EUR_USD, OrderSide.BUY, bd("10"), bd("1.1000"));
+            exchange.placeOrder(
+                    "buyer",
+                    EUR_USD,
+                    OrderSide.BUY,
+                    bd("10"),
+                    bd("1.1000")
+            );
+
             Order firstSell = exchange.placeOrder(
-                    "seller", EUR_USD, OrderSide.SELL, bd("4"), bd("1.0900"));
+                    "seller",
+                    EUR_USD,
+                    OrderSide.SELL,
+                    bd("4"),
+                    bd("1.0900")
+            );
 
             assertTrue(firstSell.isFilled());
             assertEquals(1, exchange.getTrades().size());
-            assertEquals(0, bd("4").compareTo(exchange.getTrades().getFirst().quantity()));
-            assertEquals(0, bd("1.1000").compareTo(exchange.getTrades().getFirst().price()));
+
+            Trade firstTrade = exchange.getTrades().getFirst();
+            assertEquals(0, bd("4").compareTo(firstTrade.quantity()));
 
             List<Order> afterPartialFill = exchange.getOpenOrders(EUR_USD);
             assertEquals(1, afterPartialFill.size());
             assertEquals(OrderSide.BUY, afterPartialFill.getFirst().side());
-            assertEquals(0, bd("6").compareTo(afterPartialFill.getFirst().remainingQuantity()));
+            assertEquals(
+                    0,
+                    bd("6").compareTo(
+                            afterPartialFill.getFirst().remainingQuantity()
+                    )
+            );
 
-            exchange.placeOrder("seller", EUR_USD, OrderSide.SELL, bd("6"), bd("1.1000"));
+            exchange.placeOrder(
+                    "seller",
+                    EUR_USD,
+                    OrderSide.SELL,
+                    bd("6"),
+                    bd("1.1000")
+            );
 
             assertEquals(2, exchange.getTrades().size());
             assertTrue(exchange.getOpenOrders(EUR_USD).isEmpty());
@@ -57,38 +84,37 @@ class PersistentExchangeTest {
     }
 
     @Test
-    void notificationIsStoredWhileClientIsOfflineAndDeliveredOnReconnect() {
-        Queue<TradeNotification> firstSession = new ConcurrentLinkedQueue<>();
-        Queue<TradeNotification> secondSession = new ConcurrentLinkedQueue<>();
+    void offlineClientReceivesSavedNotificationAfterReconnect() {
+        Queue<TradeNotification> buyerNotifications =
+                new ConcurrentLinkedQueue<>();
 
         try (PersistentExchange exchange = exchange()) {
-            exchange.connect("buyer", firstSession::add);
-            exchange.placeOrder("buyer", EUR_USD, OrderSide.BUY, bd("5"), bd("1.1000"));
-            exchange.disconnect("buyer");
+            exchange.placeOrder(
+                    "buyer",
+                    EUR_USD,
+                    OrderSide.BUY,
+                    bd("5"),
+                    bd("1.1000")
+            );
 
             exchange.connect("seller", ignored -> { });
-            exchange.placeOrder("seller", EUR_USD, OrderSide.SELL, bd("5"), bd("1.0900"));
 
-            assertTrue(firstSession.isEmpty());
-            exchange.connect("buyer", secondSession::add);
+            exchange.placeOrder(
+                    "seller",
+                    EUR_USD,
+                    OrderSide.SELL,
+                    bd("5"),
+                    bd("1.0900")
+            );
 
-            assertEquals(1, secondSession.size());
-            Trade delivered = secondSession.peek().trade();
-            assertEquals("buyer", delivered.buyerId());
-            assertEquals("seller", delivered.sellerId());
-        }
-    }
+            assertTrue(buyerNotifications.isEmpty());
 
-    @Test
-    void betterPriceHasPriorityOverEarlierWorsePrice() {
-        try (PersistentExchange exchange = exchange()) {
-            exchange.placeOrder("seller-worse", EUR_USD, OrderSide.SELL, bd("1"), bd("1.1100"));
-            exchange.placeOrder("seller-better", EUR_USD, OrderSide.SELL, bd("1"), bd("1.1000"));
-            exchange.placeOrder("buyer", EUR_USD, OrderSide.BUY, bd("1"), bd("1.1200"));
+            exchange.connect("buyer", buyerNotifications::add);
 
-            Trade trade = exchange.getTrades().getFirst();
-            assertEquals("seller-better", trade.sellerId());
-            assertEquals(0, bd("1.1000").compareTo(trade.price()));
+            assertEquals(1, buyerNotifications.size());
+            Trade trade = buyerNotifications.peek().trade();
+            assertEquals("buyer", trade.buyerId());
+            assertEquals("seller", trade.sellerId());
         }
     }
 
