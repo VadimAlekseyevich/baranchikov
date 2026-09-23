@@ -41,7 +41,7 @@ public final class PersistentExchange implements Exchange, AutoCloseable {
             }
 
             connection = DriverManager.getConnection(
-                    "jdbc:h2:file:" + absolute + ";DB_CLOSE_ON_EXIT=FALSE",
+                    "jdbc:h2:file:" + absolute + ";DB_CLOSE_ON_EXIT=FALSE;WRITE_DELAY=0",
                     "sa",
                     ""
             );
