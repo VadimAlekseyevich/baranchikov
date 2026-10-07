@@ -1,0 +1,25 @@
+services:
+  exchange-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: server
+    ports:
+      - "9000:9000/udp"
+    volumes:
+      - exchange-data:/app/data
+    restart: unless-stopped
+
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: tests
+    depends_on:
+      - exchange-server
+    environment:
+      EXCHANGE_HOST: exchange-server
+      EXCHANGE_PORT: "9000"
+
+volumes:
+  exchange-data:
