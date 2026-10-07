@@ -1,0 +1,179 @@
+# Лабораторная работа №3 — программа с интерфейсом IP
+
+Вариант предметной области: **биржа валют**.  
+Вариант сетевого интерфейса: **2 — UDP-сокет**.
+
+## Что сделано
+
+Третья лабораторная продолжает `lab2`: бизнес-логика биржи и H2-хранилище сохранены, а клиентские операции теперь доступны через UDP.
+
+Каждое сообщение передаётся одной UDP-датаграммой. Сервер запоминает адрес подключённого клиента как соответствие `clientId -> SocketAddress`, поэтому может отправлять на нужный UDP-сокет как ответ на команду, так и отдельное асинхронное уведомление о сделке.
+
+Архитектура:
+
+```text
+UdpExchangeClient
+        |
+        | UDP datagrams
+        v
+UdpExchangeServer
+        |
+        | Exchange API
+        v
+PersistentExchange
+        |
+        | JDBC
+        v
+       H2
+```
+
+`PersistentExchange`, модели и бизнес-правила перенесены из `lab2` без изменения. Новый сетевой код находится в `org.example.exchange.udp`:
+
+- `UdpExchangeServer` — принимает датаграммы, вызывает биржу, хранит UDP endpoints клиентов и отправляет ответы/уведомления;
+- `UdpExchangeClient` — клиентская обёртка над протоколом, используемая приложением и интеграционными тестами;
+- `UdpProtocol` — кодирование и разбор сообщений.
+
+## Как запоминается UDP-клиент
+
+Клиент выполняет:
+
+```text
+CONNECT|requestId|clientId
+```
+
+Вместе с датаграммой сервер получает `SocketAddress` отправителя (IP + UDP-порт) и сохраняет его для `clientId`. После этого сервер регистрирует listener в `PersistentExchange`.
+
+Когда биржа формирует `TradeNotification`, callback находит сохранённый endpoint и отправляет туда отдельную датаграмму `EVENT|TRADE|...`.
+
+Если тот же `clientId` выполняет `CONNECT` с другого UDP-сокета, endpoint заменяется новым. `DISCONNECT` удаляет endpoint и listener.
+
+## Протокол
+
+Все датаграммы — UTF-8, разделитель полей — `|`. Каждый запрос имеет `requestId`, чтобы клиент мог сопоставить ответ с запросом независимо от прихода асинхронных событий.
+
+### CONNECT
+
+```text
+CONNECT|requestId|clientId
+OK|requestId|CONNECTED
+```
+
+### DISCONNECT
+
+```text
+DISCONNECT|requestId|clientId
+OK|requestId|DISCONNECTED
+```
+
+### PLACE_ORDER
+
+```text
+PLACE_ORDER|requestId|clientId|base|quote|side|quantity|limitPrice
+OK|requestId|ORDER|...
+```
+
+Пример:
+
+```text
+PLACE_ORDER|42|buyer|EUR|USD|BUY|10|1.1000
+```
+
+### GET_OPEN_ORDERS
+
+```text
+GET_OPEN_ORDERS|requestId|base|quote
+OK|requestId|OPEN_ORDERS|count|...
+```
+
+### GET_TRADES
+
+```text
+GET_TRADES|requestId
+OK|requestId|TRADES|count|...
+```
+
+### Ошибка
+
+```text
+ERROR|requestId|message
+```
+
+## Уведомления
+
+Уведомление отправляется отдельной датаграммой:
+
+```text
+EVENT|TRADE|clientId|tradeId|base|quote|price|quantity|buyOrderId|sellOrderId|buyerId|sellerId
+```
+
+Один `PLACE_ORDER` может привести к независимым сообщениям:
+
+```text
+клиент -> сервер: PLACE_ORDER|...
+сервер -> клиент: OK|...|ORDER|...
+сервер -> buyer:  EVENT|TRADE|...
+сервер -> seller: EVENT|TRADE|...
+```
+
+Порядок прихода `OK` и `EVENT` не считается фиксированным. `UdpExchangeClient` маршрутизирует ответы по `requestId`, а события кладёт в отдельную очередь уведомлений.
+
+## Offline-уведомления и H2
+
+Механизм второй лабораторной сохранён. Если клиент не подключён, `PersistentExchange` сохраняет уведомление в таблице `pending_notifications`.
+
+При следующем `CONNECT` сервер сначала запоминает текущий UDP endpoint, затем регистрирует listener. Поэтому восстановленные из H2 уведомления сразу отправляются на актуальный UDP-сокет клиента.
+
+Состояние ордеров, сделок и pending-уведомлений переживает перезапуск сервера.
+
+## Ограничения UDP
+
+UDP не гарантирует доставку, отсутствие дубликатов и порядок датаграмм. Лабораторная намеренно не реализует собственный надёжный транспорт поверх UDP, поскольку этого нет в варианте задания.
+
+Каждая команда, ответ и уведомление помещается в одну датаграмму. Поэтому очень большие ответы `GET_OPEN_ORDERS` и `GET_TRADES` ограничены максимальным размером UDP-пакета; для объёма лабораторных данных этого достаточно.
+
+## Запуск
+
+Из папки `lab3`:
+
+```bash
+mvn test
+mvn package
+```
+
+`Main` принимает два необязательных аргумента:
+
+```text
+1: путь к H2 database file (по умолчанию data/exchange)
+2: UDP-порт (по умолчанию 9000)
+```
+
+Например:
+
+```text
+data/exchange 9000
+```
+
+## Тесты
+
+В `lab3` сохранены тесты `lab2`: matching, многопоточность, штатный перезапуск, нештатное завершение JVM и восстановление данных.
+
+Дополнительно `UdpExchangeIntegrationTest` проверяет через реальный UDP-интерфейс:
+
+1. частичное и полное исполнение ордеров;
+2. уведомления обоим online-клиентам на их UDP endpoints;
+3. сохранение уведомления offline-клиента и доставку после `CONNECT`;
+4. восстановление состояния и pending-уведомлений после перезапуска UDP-сервера.
+
+В сетевых тестах сервер привязывается к порту `0`, поэтому ОС выбирает свободный локальный UDP-порт.
+
+## Отличие от lab2
+
+```text
+lab2:
+Java caller -> Exchange -> PersistentExchange -> H2
+
+lab3:
+UdpExchangeClient -> UDP -> UdpExchangeServer -> Exchange -> PersistentExchange -> H2
+```
+
+UDP-слой отвечает только за разбор команд, передачу аргументов в `Exchange`, кодирование результата, запоминание endpoint клиента и доставку уведомлений. Бизнес-логика matching остаётся в `PersistentExchange`.
