@@ -3,7 +3,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: server
+    command:
+      - java
+      - -cp
+      - target/classes:target/dependency/*
+      - org.example.Main
+      - /app/data/exchange
+      - "9000"
     ports:
       - "9000:9000/udp"
     volumes:
@@ -14,12 +20,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: tests
     depends_on:
       - exchange-server
     environment:
       EXCHANGE_HOST: exchange-server
       EXCHANGE_PORT: "9000"
+    command:
+      - mvn
+      - -q
+      - test
 
 volumes:
   exchange-data:
