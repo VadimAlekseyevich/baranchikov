@@ -1,0 +1,27 @@
+syntax = "proto3";
+package exchange;
+option java_package = "org.example.exchange.wire";
+option java_outer_classname = "ExchangeWire";
+
+// Internal contract used ONLY between the facade, business and storage services.
+// External UDP clients continue using the lab3 text protocol.
+message Packet {
+  string op = 1;
+  string client_id = 2;
+  string base = 3;
+  string quote = 4;
+  string side = 5;
+  string quantity = 6;
+  string price = 7;
+  int64 order_id = 8;
+  string remaining = 9;
+  int64 trade_id = 10;
+  int64 buy_order_id = 11;
+  int64 sell_order_id = 12;
+  string buyer_id = 13;
+  string seller_id = 14;
+  string error = 15;
+  bool found = 16;
+  repeated Packet items = 17;
+  int64 notification_id = 18;
+}

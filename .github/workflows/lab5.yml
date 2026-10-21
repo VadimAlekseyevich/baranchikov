@@ -1,0 +1,54 @@
+name: Lab 5 build and tests
+on:
+  push:
+    paths: ['lab5/**', '.github/workflows/lab5.yml']
+  pull_request:
+    paths: ['lab5/**', '.github/workflows/lab5.yml']
+jobs:
+  maven-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+          cache-dependency-path: lab5/pom.xml
+      - name: Unit and local integration tests
+        working-directory: lab5
+        run: mvn -B test
+  docker-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Docker layers and UDP integration
+        working-directory: lab5
+        run: |
+          docker compose build
+          docker compose up -d facade
+          docker compose run --rm tests
+      - name: Restart persistence verification
+        working-directory: lab5
+        run: sh ./verify-persistence.sh
+      - name: Performance measurements at 1, 2 and 3 replicas
+        working-directory: lab5
+        env:
+          BENCH_REQUESTS: '120'
+          BENCH_THREADS: '6'
+        run: sh ./benchmark.sh
+      - name: Upload measured throughput and comparison
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab5-benchmark
+          path: |
+            lab5/benchmark-results.csv
+            lab5/benchmark-comparison.md
+      - name: Container logs if failed
+        if: failure()
+        working-directory: lab5
+        run: docker compose logs --no-color --tail=150
+      - name: Cleanup
+        if: always()
+        working-directory: lab5
+        run: docker compose down -v || true

@@ -1,34 +1,68 @@
 services:
-  exchange-server:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command:
-      - java
-      - -cp
-      - target/classes:target/dependency/*
-      - org.example.Main
-      - /app/data/exchange
-      - "9000"
-    ports:
-      - "9000:9000/udp"
+  database:
+    build: .
+    command: ["java", "-cp", "target/classes:target/dependency/*", "org.example.exchange.distributed.DatabaseMain"]
     volumes:
       - exchange-data:/app/data
     restart: unless-stopped
 
-  tests:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  storage:
+    build: .
     depends_on:
-      - exchange-server
+      - database
     environment:
-      EXCHANGE_HOST: exchange-server
+      H2_URL: "jdbc:h2:tcp://database:9092/exchange;WRITE_DELAY=0;LOCK_TIMEOUT=30000"
+      STORAGE_PORT: "9102"
+    command: ["java", "-cp", "target/classes:target/dependency/*", "org.example.exchange.distributed.StorageMain"]
+    restart: unless-stopped
+
+  business:
+    build: .
+    depends_on:
+      - storage
+    environment:
+      STORAGE_HOST: storage
+      STORAGE_PORT: "9102"
+      BUSINESS_PORT: "9101"
+    command: ["java", "-cp", "target/classes:target/dependency/*", "org.example.exchange.distributed.BusinessMain"]
+    restart: unless-stopped
+
+  facade:
+    build: .
+    depends_on:
+      - business
+    environment:
+      BUSINESS_HOST: business
+      BUSINESS_PORT: "9101"
+      FACADE_PORT: "9000"
+    command: ["java", "-cp", "target/classes:target/dependency/*", "org.example.exchange.distributed.FacadeMain"]
+    # Docker publishes an automatically assigned host UDP port for EACH facade replica.
+    # Run 'docker compose ps facade' to see it. Other containers use facade:9000.
+    ports:
+      - "9000/udp"
+    restart: unless-stopped
+
+  tests:
+    build: .
+    depends_on:
+      - facade
+    environment:
+      EXCHANGE_HOST: facade
       EXCHANGE_PORT: "9000"
-    command:
-      - mvn
-      - -q
-      - test
+    command: ["mvn", "-B", "test"]
+    profiles: ["tools"]
+
+  benchmark:
+    build: .
+    depends_on:
+      - facade
+    environment:
+      EXCHANGE_HOST: facade
+      EXCHANGE_PORT: "9000"
+      BENCH_REQUESTS: "500"
+      BENCH_THREADS: "8"
+    command: ["java", "-cp", "target/classes:target/dependency/*", "org.example.exchange.distributed.BenchmarkMain"]
+    profiles: ["tools"]
 
 volumes:
   exchange-data:
