@@ -11,18 +11,30 @@ function Invoke-Docker([string[]] $Params) {
     & docker compose @Params
     if ($LASTEXITCODE -ne 0) { throw "Docker command failed: $($Params -join ' ')" }
 }
+function Assert-Replicas([string] $Layer, [int] $Expected) {
+    $ids = @(& docker compose ps -q $Layer)
+    if ($LASTEXITCODE -ne 0) { throw "Cannot check running replicas of $Layer" }
+    $actual = @($ids | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count
+    if ($actual -ne $Expected) {
+        throw "Expected $Expected running $Layer containers, found $actual. Benchmark results would be invalid."
+    }
+}
 Invoke-Docker -Params @('up','-d','--build','--scale','facade=1','--scale','business=1','--scale','storage=1','facade')
 foreach ($layer in @('facade','business','storage')) {
     foreach ($replicas in @(1,2,3)) {
         Invoke-Docker -Params @('up','-d','--scale','facade=1','--scale','business=1','--scale','storage=1','facade')
         Invoke-Docker -Params @('up','-d','--scale',"$layer=$replicas",$layer)
         Start-Sleep -Seconds 4
+        Assert-Replicas $layer $replicas
         Write-Host "Benchmarking $layer replicas=$replicas ..."
         Remove-Item -Path $resultFile -Force -ErrorAction SilentlyContinue
         # Do not use '$lines = & docker ...' here: redirected Docker output can
         # trigger "failed to get console: The handle is invalid" on Windows.
-        & docker compose run --rm -T --interactive=false -e "BENCH_REQUESTS=$env:BENCH_REQUESTS" -e "BENCH_THREADS=$env:BENCH_THREADS" -e "BENCH_RESULT_FILE=/results/benchmark-last-result.txt" benchmark
+        # --no-deps is essential: otherwise Compose reconciles facade/business/storage
+        # to one replica when starting this one-off benchmark container.
+        & docker compose run --no-deps --rm -T --interactive=false -e "BENCH_REQUESTS=$env:BENCH_REQUESTS" -e "BENCH_THREADS=$env:BENCH_THREADS" -e "BENCH_RESULT_FILE=/results/benchmark-last-result.txt" benchmark
         if ($LASTEXITCODE -ne 0) { throw 'Benchmark run failed' }
+        Assert-Replicas $layer $replicas
         if (-not (Test-Path $resultFile)) { throw 'Benchmark did not write the RESULT file' }
         $result = @(Get-Content $resultFile | Where-Object { $_ -like 'RESULT,*' } | Select-Object -Last 1)
         if ($result.Count -ne 1) { throw 'Benchmark RESULT file is empty or malformed' }
