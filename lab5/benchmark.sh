@@ -46,3 +46,26 @@ awk -F, '
   }
 ' "$OUTPUT" > benchmark-comparison.md
 cat benchmark-comparison.md
+
+# Compare the measured throughput against the 1-replica baseline.
+awk -F, '
+BEGIN {
+  print "# Comparison of measured throughput\n"
+  print "| Scaled layer | 1 replica, rps | 2 replicas, rps | 3 replicas, rps | Speedup x2 | Speedup x3 |"
+  print "|---|---:|---:|---:|---:|---:|"
+}
+NR > 1 { rps[$1, $2] = $7 }
+END {
+  split("facade business storage", layers, " ")
+  for (i = 1; i <= 3; i++) {
+    layer = layers[i]
+    one = rps[layer, 1] + 0
+    two = rps[layer, 2] + 0
+    three = rps[layer, 3] + 0
+    if (one > 0) {
+      printf "| %s | %.2f | %.2f | %.2f | %.2fx | %.2fx |\n", layer, one, two, three, two / one, three / one
+    }
+  }
+  print "\nWorkload: UDP GET_OPEN_ORDERS; throughput and latency depend on host resources."
+}' "$OUTPUT" > benchmark-comparison.md
+echo "Written benchmark-comparison.md (computed from measured CSV)."

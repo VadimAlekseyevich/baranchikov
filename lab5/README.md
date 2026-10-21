@@ -60,7 +60,7 @@ docker compose run --rm tests
 .\benchmark.cmd
 ```
 
-или `powershell -ExecutionPolicy Bypass -File .\benchmark.ps1` (Linux/macOS: `sh ./benchmark.sh`). Скрипт последовательно масштабирует **только один компонент** до 1, 2 и 3 реплик, остальные возвращает к одной реплике, запускает одинаковый read-only UDP workload через контейнер `benchmark` и сохраняет **реально измеренные** данные в `benchmark-results.csv` и итоговое сравнение ускорения в `benchmark-comparison.md`:
+или `powershell -ExecutionPolicy Bypass -File .\benchmark.ps1` (Linux/macOS: `sh ./benchmark.sh`). Скрипт последовательно масштабирует **только один компонент** до 1, 2 и 3 реплик, остальные возвращает к одной реплике, запускает одинаковый read-only UDP workload через контейнер `benchmark` и сохраняет **реально измеренные** данные в `benchmark-results.csv`:
 
 ```text
 layer,replicas,threads,requests,completed,errors,rps,p50_ms,p95_ms
