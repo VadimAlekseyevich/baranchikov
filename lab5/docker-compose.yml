@@ -35,6 +35,7 @@ services:
       BUSINESS_HOST: business
       BUSINESS_PORT: "9101"
       FACADE_PORT: "9000"
+    command: ["java", "-cp", "target/classes:target/dependency/*", "org.example.exchange.distributed.FacadeMain"]
     # Docker publishes an automatically assigned host UDP port for EACH facade replica.
     # Run 'docker compose ps facade' to see it. Other containers use facade:9000.
     ports:
