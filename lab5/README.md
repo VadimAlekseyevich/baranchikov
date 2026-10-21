@@ -87,3 +87,8 @@ docker compose ps
 docker compose down          # остановка с сохранением volume
 docker compose down -v       # удаляет также ВСЕ ДАННЫЕ H2 в volume этого Compose-проекта
 ```
+
+
+## Результаты реальных замеров
+
+Результаты запуска GitHub Actions от 21.10.2026 со сравнением масштабирования сохранены в [папке benchmarks](benchmarks/README.md).
