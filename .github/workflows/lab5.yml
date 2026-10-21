@@ -31,6 +31,19 @@ jobs:
       - name: Restart persistence verification
         working-directory: lab5
         run: sh ./verify-persistence.sh
+      - name: Performance measurements at 1, 2 and 3 replicas
+        working-directory: lab5
+        env:
+          BENCH_REQUESTS: '120'
+          BENCH_THREADS: '6'
+        run: sh ./benchmark.sh
+      - name: Upload measured throughput and comparison
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab5-benchmark
+          path: |
+            lab5/benchmark-results.csv
+            lab5/benchmark-comparison.md
       - name: Container logs if failed
         if: failure()
         working-directory: lab5

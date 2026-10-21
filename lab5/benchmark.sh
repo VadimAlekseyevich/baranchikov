@@ -26,3 +26,23 @@ for layer in facade business storage; do
 done
 docker compose up -d --scale facade=1 --scale business=1 --scale storage=1 facade
 echo "Written $OUTPUT (real measured results)."
+
+# Actual comparisons based exclusively on the generated measurements.
+awk -F, '
+  NR == 1 { next }
+  { rate[$1, $2] = $7 }
+  END {
+    print "# Comparison of measured throughput"
+    print ""
+    print "| Scaled layer | 1 replica, rps | 2 replicas, rps | 3 replicas, rps | Speedup ×2 | Speedup ×3 |"
+    print "|---|---:|---:|---:|---:|---:|"
+    split("facade business storage", layers, " ")
+    for (i=1;i<=3;i++) {
+      k=layers[i]; b=rate[k,1]+0
+      if (b>0) printf "| %s | %.2f | %.2f | %.2f | %.2fx | %.2fx |\n", k, b, rate[k,2], rate[k,3], rate[k,2]/b, rate[k,3]/b
+    }
+    print ""
+    print "Workload: independent UDP GET_OPEN_ORDERS requests. Comparison is an observed single run, not a promised linear speedup."
+  }
+' "$OUTPUT" > benchmark-comparison.md
+cat benchmark-comparison.md
