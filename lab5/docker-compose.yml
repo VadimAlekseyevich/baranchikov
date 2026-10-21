@@ -56,6 +56,10 @@ services:
     build: .
     depends_on:
       - facade
+    # Windows PowerShell reads results from this file instead of redirecting
+    # Docker Compose stdout (which may fail with an invalid console handle).
+    volumes:
+      - ./:/results
     environment:
       EXCHANGE_HOST: facade
       EXCHANGE_PORT: "9000"
