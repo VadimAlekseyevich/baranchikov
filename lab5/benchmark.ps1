@@ -3,6 +3,9 @@ Set-Location $PSScriptRoot
 if (-not $env:BENCH_REQUESTS) { $env:BENCH_REQUESTS = '500' }
 if (-not $env:BENCH_THREADS) { $env:BENCH_THREADS = '8' }
 $output = 'benchmark-results.csv'
+# Docker Compose on Windows can fail when its STDOUT is captured by PowerShell.
+# Let the benchmark container write its RESULT directly to this bind-mounted file.
+$resultFile = Join-Path $PSScriptRoot 'benchmark-last-result.txt'
 'layer,replicas,threads,requests,completed,errors,rps,p50_ms,p95_ms' | Set-Content $output
 function Invoke-Docker([string[]] $Params) {
     & docker compose @Params
@@ -15,14 +18,19 @@ foreach ($layer in @('facade','business','storage')) {
         Invoke-Docker -Params @('up','-d','--scale',"$layer=$replicas",$layer)
         Start-Sleep -Seconds 4
         Write-Host "Benchmarking $layer replicas=$replicas ..."
-        $lines = & docker compose run --rm -T -e "BENCH_REQUESTS=$env:BENCH_REQUESTS" -e "BENCH_THREADS=$env:BENCH_THREADS" benchmark
+        Remove-Item -Path $resultFile -Force -ErrorAction SilentlyContinue
+        # Do not use '$lines = & docker ...' here: redirected Docker output can
+        # trigger "failed to get console: The handle is invalid" on Windows.
+        & docker compose run --rm -T --interactive=false -e "BENCH_REQUESTS=$env:BENCH_REQUESTS" -e "BENCH_THREADS=$env:BENCH_THREADS" -e "BENCH_RESULT_FILE=/results/benchmark-last-result.txt" benchmark
         if ($LASTEXITCODE -ne 0) { throw 'Benchmark run failed' }
-        $result = @($lines | Where-Object { $_ -like 'RESULT,*' } | Select-Object -Last 1)
-        if ($result.Count -ne 1) { throw 'Benchmark did not print a RESULT row' }
+        if (-not (Test-Path $resultFile)) { throw 'Benchmark did not write the RESULT file' }
+        $result = @(Get-Content $resultFile | Where-Object { $_ -like 'RESULT,*' } | Select-Object -Last 1)
+        if ($result.Count -ne 1) { throw 'Benchmark RESULT file is empty or malformed' }
         "$layer,$replicas,$($result[0].Substring(7))" | Add-Content $output
     }
 }
 Invoke-Docker -Params @('up','-d','--scale','facade=1','--scale','business=1','--scale','storage=1','facade')
+Remove-Item -Path $resultFile -Force -ErrorAction SilentlyContinue
 Write-Host "Measured results written to $output"
 $results = Import-Csv $output
 $report = @(

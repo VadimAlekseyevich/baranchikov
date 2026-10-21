@@ -5,6 +5,8 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -55,7 +57,14 @@ public final class BenchmarkMain {
             double rps = done / seconds;
             double p50 = percentile(latencies, .50) / 1_000_000.0;
             double p95 = percentile(latencies, .95) / 1_000_000.0;
-            System.out.printf(Locale.US, "RESULT,%d,%d,%d,%d,%.3f,%.3f,%.3f%n", threads, requests, done, errors, rps, p50, p95);
+            String result = String.format(Locale.US, "RESULT,%d,%d,%d,%d,%.3f,%.3f,%.3f",
+                    threads, requests, done, errors, rps, p50, p95);
+            System.out.println(result);
+            // Optional bind-mounted output avoids redirected Docker stdout on Windows.
+            String resultFile = System.getenv("BENCH_RESULT_FILE");
+            if (resultFile != null && !resultFile.isBlank()) {
+                Files.writeString(Path.of(resultFile), result + System.lineSeparator(), StandardCharsets.UTF_8);
+            }
             if (errors != 0) throw new IllegalStateException(errors + " benchmark requests failed");
         }
     }
