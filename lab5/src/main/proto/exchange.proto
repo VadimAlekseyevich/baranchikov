@@ -1,50 +1,27 @@
 syntax = "proto3";
 package exchange;
-option java_package = "org.example.exchange.proto";
-option java_outer_classname = "ExchangeMessages";
+option java_package = "org.example.exchange.wire";
+option java_outer_classname = "ExchangeWire";
 
-message Envelope {
-  string request_id = 1;
-  string operation = 2;
-  bytes payload = 3;
-  bool success = 4;
-  string error = 5;
-}
-message OrderRequest {
-  string client_id = 1;
-  string base = 2;
-  string quote = 3;
-  string side = 4;
-  string quantity = 5;
-  string price = 6;
-}
-message OrderRecord {
-  int64 id = 1;
+// Internal contract used ONLY between the facade, business and storage services.
+// External UDP clients continue using the lab3 text protocol.
+message Packet {
+  string op = 1;
   string client_id = 2;
   string base = 3;
   string quote = 4;
   string side = 5;
-  string price = 6;
-  string original_quantity = 7;
-  string remaining_quantity = 8;
-}
-message TradeRecord {
-  int64 id = 1;
-  string base = 2;
-  string quote = 3;
-  string price = 4;
-  string quantity = 5;
-  int64 buy_order_id = 6;
-  int64 sell_order_id = 7;
-  string buyer_id = 8;
-  string seller_id = 9;
-}
-message Records {
-  repeated OrderRecord orders = 1;
-  repeated TradeRecord trades = 2;
-}
-message ClientRequest {
-  string client_id = 1;
-  string base = 2;
-  string quote = 3;
+  string quantity = 6;
+  string price = 7;
+  int64 order_id = 8;
+  string remaining = 9;
+  int64 trade_id = 10;
+  int64 buy_order_id = 11;
+  int64 sell_order_id = 12;
+  string buyer_id = 13;
+  string seller_id = 14;
+  string error = 15;
+  bool found = 16;
+  repeated Packet items = 17;
+  int64 notification_id = 18;
 }
