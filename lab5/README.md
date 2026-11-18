@@ -30,10 +30,18 @@ UDP client (lab3) --> facade:9000/udp       [валидация, адаптац�
 
 ## Запуск из IDEA
 
-Открой `lab5/pom.xml` как Maven-проект; требуется **JDK 23+**. В папке `lab5` запусти:
+Открой корень репозитория как Maven-проект через корневой `pom.xml`, либо импортируй отдельно `lab5/pom.xml`. Требуется **JDK 23+**. В IntelliJ IDEA выбери в окне Maven **Reload All Maven Projects**, затем выполни Maven-goal `generate-sources` для модуля `lab5`. Это создаст класс `org.example.exchange.wire.ExchangeWire` из `src/main/proto/exchange.proto` в `lab5/target/generated-sources/protobuf/java`. При компиляции напрямую кнопкой Build без Maven-генерации этот класс отсутствует, и импорты `ExchangeWire.Packet` не разрешаются.
+
+Из корня репозитория можно выполнить:
 
 ```powershell
-mvn test
+mvn -pl lab5 -am clean test
+```
+
+Или из папки `lab5`:
+
+```powershell
+mvn clean test
 ```
 
 Обычный `mvn test` запускает локальные тесты. `DockerPersistenceTest` и `DockerUdpIntegrationTest` без специальных переменных окружения пропускаются. Не отключай JUnit conditions в IDE (иначе Docker-only тест попытается подключиться к несуществующему серверу).
