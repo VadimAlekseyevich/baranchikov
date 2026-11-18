@@ -1,6 +1,6 @@
 # Лабораторная №5 — распределённая слоистая архитектура (полное задание)
 
-Продолжение `lab4`. Внешний протокол прежний: **текстовые UDP датаграммы**, например `PLACE_ORDER|1|buyer|EUR|USD|BUY|10|1.1000`. Между контейнерами используется **Google Protocol Buffers** по TCP, с length-delimited framing. Контракт в [`src/main/proto/exchange.proto`](src/main/proto/exchange.proto); Java классы генерируются Maven-плагином.
+Продолжение `lab4`. Внешний протокол прежний: **текстовые UDP датаграммы**, например `PLACE_ORDER|1|buyer|EUR|USD|BUY|10|1.1000`. Между контейнерами используется **Google Protocol Buffers** по TCP, с length-delimited framing. Контракт в [`src/main/proto/exchange.proto`](src/main/proto/exchange.proto); реализация `ExchangeWire.Packet` находится в [`src/main/java/org/example/exchange/wire/ExchangeWire.java`](src/main/java/org/example/exchange/wire/ExchangeWire.java) и использует бинарный формат Protocol Buffers. Генерация через `protoc` не требуется.
 
 ## Схема
 
@@ -30,17 +30,13 @@ UDP client (lab3) --> facade:9000/udp       [валидация, адаптац�
 
 ## Запуск из IDEA
 
-Открой корень репозитория как Maven-проект через корневой `pom.xml`, либо импортируй отдельно `lab5/pom.xml`. Требуется **JDK 23+**. В IntelliJ IDEA выбери в окне Maven **Reload All Maven Projects**, затем выполни Maven-goal `generate-sources` для модуля `lab5`. Это создаст класс `org.example.exchange.wire.ExchangeWire` из `src/main/proto/exchange.proto` в `lab5/target/generated-sources/protobuf/java`. При компиляции напрямую кнопкой Build без Maven-генерации этот класс отсутствует, и импорты `ExchangeWire.Packet` не разрешаются.
+Открой `lab5/pom.xml` как Maven-проект в IntelliJ IDEA; требуется **JDK 23+**. Класс `ExchangeWire.Packet` находится в исходниках Java и не требует запуска `protoc`. В окне Maven нажми **Reload All Maven Projects** и запусти цель **test** или **Build → Rebuild Project**. Maven в терминале Windows отдельно устанавливать не нужно: IntelliJ IDEA использует встроенный Maven.
 
-Из корня репозитория на Windows выполни:
+Если Maven уже установлен, из папки `lab5` можно выполнить:
 
 ```powershell
-.\mvnw.cmd -pl lab5 -am clean test
+mvn test
 ```
-
-В проект добавлен Maven Wrapper, поэтому отдельная установка Maven и команда `mvn` в PATH не нужны. При первом запуске Wrapper автоматически загрузит Maven 3.9.9; доступ к интернету необходим. Для запуска требуется установленный JDK 23+ и доступная Java (`JAVA_HOME` или `java` в PATH). После успешной сборки нажми **Reload All Maven Projects** в IntelliJ IDEA. При необходимости открой `lab5/target/generated-sources/protobuf/java` и пометь папку как **Generated Sources Root**. Для Linux/macOS используется `./mvnw -pl lab5 -am clean test`.
-
-Если сборка из терминала по-прежнему не запускается, в IntelliJ можно воспользоваться встроенным Maven: открой справа вкладку **Maven**, выбери `lab5` → **Lifecycle** → **generate-sources**, затем **test**. Это не требует отдельной установки Maven.
 
 Обычный `mvn test` запускает локальные тесты. `DockerPersistenceTest` и `DockerUdpIntegrationTest` без специальных переменных окружения пропускаются. Не отключай JUnit conditions в IDE (иначе Docker-only тест попытается подключиться к несуществующему серверу).
 

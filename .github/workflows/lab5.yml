@@ -16,7 +16,8 @@ jobs:
           cache: maven
           cache-dependency-path: lab5/pom.xml
       - name: Unit and local integration tests
-        run: bash ./mvnw -B -pl lab5 -am test
+        working-directory: lab5
+        run: mvn -B test
   docker-integration:
     runs-on: ubuntu-latest
     steps:
