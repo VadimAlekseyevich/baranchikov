@@ -1,4 +1,8 @@
-package org.example.exchange.distributed;
+package org.example.exchange.tests.lab6;
+
+import org.example.exchange.distributed.ShardRouting;
+import org.example.exchange.distributed.Wire;
+import org.example.exchange.distributed.LayerTestBridge;
 
 import org.example.exchange.wire.ExchangeWire.Packet;
 import org.junit.jupiter.api.Test;
@@ -52,6 +56,6 @@ class ShardRoutingTest {
         for (int i = 0; ShardRouting.index(base, "USD", 3) == 0; i++) base = "C" + i;
         Packet request = Wire.packet("PLACE_ORDER").setClientId("buyer").setBase(base)
                 .setQuote("USD").setSide("BUY").setQuantity("2").setPrice("1").build();
-        assertThrows(IllegalArgumentException.class, () -> BusinessMain.requireOwner(request));
+        assertThrows(IllegalArgumentException.class, () -> LayerTestBridge.requireOwner(request));
     }
 }

@@ -1,4 +1,8 @@
-package org.example.exchange.distributed;
+package org.example.exchange.tests.lab6;
+
+import org.example.exchange.distributed.ShardRouting;
+import org.example.exchange.distributed.Wire;
+import org.example.exchange.distributed.LayerTestBridge;
 
 import org.example.exchange.wire.ExchangeWire.Packet;
 import org.junit.jupiter.api.Test;
@@ -13,8 +17,8 @@ class StorageShardOperationsTest {
     void cancellationChangesOnlyOwnOrdersAndOnlyOneShard() throws Exception {
         try (Connection first = DriverManager.getConnection("jdbc:h2:mem:lab6_first;DB_CLOSE_DELAY=-1");
              Connection second = DriverManager.getConnection("jdbc:h2:mem:lab6_second;DB_CLOSE_DELAY=-1")) {
-            StorageMain.initialize(first);
-            StorageMain.initialize(second);
+            LayerTestBridge.initialize(first);
+            LayerTestBridge.initialize(second);
             first.setAutoCommit(false);
             second.setAutoCommit(false);
 
@@ -25,18 +29,18 @@ class StorageShardOperationsTest {
             first.commit();
             second.commit();
 
-            Packet firstCancellation = StorageMain.process(first,
+            Packet firstCancellation = LayerTestBridge.process(first,
                     Wire.packet("CANCEL_ALL").setClientId("user").build());
             assertEquals(2, firstCancellation.getCancelledCount());
             first.commit();
 
-            assertEquals(0, StorageMain.process(first,
+            assertEquals(0, LayerTestBridge.process(first,
                     Wire.packet("CANCEL_ALL").setClientId("user").build()).getCancelledCount());
-            assertEquals(1, StorageMain.process(first,
+            assertEquals(1, LayerTestBridge.process(first,
                     Wire.packet("OPEN_ORDERS").setBase("EUR").setQuote("USD").build()).getItemsCount());
-            assertEquals("other", StorageMain.process(first,
+            assertEquals("other", LayerTestBridge.process(first,
                     Wire.packet("OPEN_ORDERS").setBase("EUR").setQuote("USD").build()).getItems(0).getClientId());
-            assertEquals(1, StorageMain.process(second,
+            assertEquals(1, LayerTestBridge.process(second,
                     Wire.packet("OPEN_ORDERS").setBase("GBP").setQuote("USD").build()).getItemsCount());
             first.rollback();
             second.rollback();
@@ -44,7 +48,7 @@ class StorageShardOperationsTest {
     }
 
     private static void insert(Connection connection, String client, String base) throws Exception {
-        StorageMain.process(connection, Wire.packet("INSERT_ORDER").setClientId(client)
+        LayerTestBridge.process(connection, Wire.packet("INSERT_ORDER").setClientId(client)
                 .setBase(base).setQuote("USD").setSide("BUY")
                 .setQuantity("5").setPrice("1.1000").build());
     }
