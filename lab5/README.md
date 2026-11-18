@@ -32,17 +32,15 @@ UDP client (lab3) --> facade:9000/udp       [валидация, адаптац�
 
 Открой корень репозитория как Maven-проект через корневой `pom.xml`, либо импортируй отдельно `lab5/pom.xml`. Требуется **JDK 23+**. В IntelliJ IDEA выбери в окне Maven **Reload All Maven Projects**, затем выполни Maven-goal `generate-sources` для модуля `lab5`. Это создаст класс `org.example.exchange.wire.ExchangeWire` из `src/main/proto/exchange.proto` в `lab5/target/generated-sources/protobuf/java`. При компиляции напрямую кнопкой Build без Maven-генерации этот класс отсутствует, и импорты `ExchangeWire.Packet` не разрешаются.
 
-Из корня репозитория можно выполнить:
+Из корня репозитория на Windows выполни:
 
 ```powershell
-mvn -pl lab5 -am clean test
+.\mvnw.cmd -pl lab5 -am clean test
 ```
 
-Или из папки `lab5`:
+В проект добавлен Maven Wrapper, поэтому отдельная установка Maven и команда `mvn` в PATH не нужны. При первом запуске Wrapper автоматически загрузит Maven 3.9.9; доступ к интернету необходим. Для запуска требуется установленный JDK 23+ и доступная Java (`JAVA_HOME` или `java` в PATH). После успешной сборки нажми **Reload All Maven Projects** в IntelliJ IDEA. При необходимости открой `lab5/target/generated-sources/protobuf/java` и пометь папку как **Generated Sources Root**. Для Linux/macOS используется `./mvnw -pl lab5 -am clean test`.
 
-```powershell
-mvn clean test
-```
+Если сборка из терминала по-прежнему не запускается, в IntelliJ можно воспользоваться встроенным Maven: открой справа вкладку **Maven**, выбери `lab5` → **Lifecycle** → **generate-sources**, затем **test**. Это не требует отдельной установки Maven.
 
 Обычный `mvn test` запускает локальные тесты. `DockerPersistenceTest` и `DockerUdpIntegrationTest` без специальных переменных окружения пропускаются. Не отключай JUnit conditions в IDE (иначе Docker-only тест попытается подключиться к несуществующему серверу).
 
