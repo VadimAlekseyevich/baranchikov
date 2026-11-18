@@ -1,0 +1,120 @@
+services:
+  database-0:
+    build: .
+    command: ["java", "-cp", "target/classes:target/dependency/*", "org.example.exchange.distributed.DatabaseMain"]
+    volumes:
+      - shard-0-data:/app/data
+    restart: unless-stopped
+
+  storage-0:
+    build: .
+    depends_on:
+      - database-0
+    environment:
+      H2_URL: "jdbc:h2:tcp://database-0:9092/exchange;WRITE_DELAY=0;LOCK_TIMEOUT=30000"
+      STORAGE_PORT: "9102"
+    command: ["java", "-cp", "target/classes:target/dependency/*", "org.example.exchange.distributed.StorageMain"]
+    restart: unless-stopped
+
+  business-0:
+    build: .
+    depends_on:
+      - storage-0
+    environment:
+      SHARD_INDEX: "0"
+      SHARD_COUNT: "3"
+      STORAGE_HOST: "storage-0"
+      STORAGE_PORT: "9102"
+      BUSINESS_PORT: "9101"
+    command: ["java", "-cp", "target/classes:target/dependency/*", "org.example.exchange.distributed.BusinessMain"]
+    restart: unless-stopped
+
+  database-1:
+    build: .
+    command: ["java", "-cp", "target/classes:target/dependency/*", "org.example.exchange.distributed.DatabaseMain"]
+    volumes:
+      - shard-1-data:/app/data
+    restart: unless-stopped
+
+  storage-1:
+    build: .
+    depends_on:
+      - database-1
+    environment:
+      H2_URL: "jdbc:h2:tcp://database-1:9092/exchange;WRITE_DELAY=0;LOCK_TIMEOUT=30000"
+      STORAGE_PORT: "9102"
+    command: ["java", "-cp", "target/classes:target/dependency/*", "org.example.exchange.distributed.StorageMain"]
+    restart: unless-stopped
+
+  business-1:
+    build: .
+    depends_on:
+      - storage-1
+    environment:
+      SHARD_INDEX: "1"
+      SHARD_COUNT: "3"
+      STORAGE_HOST: "storage-1"
+      STORAGE_PORT: "9102"
+      BUSINESS_PORT: "9101"
+    command: ["java", "-cp", "target/classes:target/dependency/*", "org.example.exchange.distributed.BusinessMain"]
+    restart: unless-stopped
+
+  database-2:
+    build: .
+    command: ["java", "-cp", "target/classes:target/dependency/*", "org.example.exchange.distributed.DatabaseMain"]
+    volumes:
+      - shard-2-data:/app/data
+    restart: unless-stopped
+
+  storage-2:
+    build: .
+    depends_on:
+      - database-2
+    environment:
+      H2_URL: "jdbc:h2:tcp://database-2:9092/exchange;WRITE_DELAY=0;LOCK_TIMEOUT=30000"
+      STORAGE_PORT: "9102"
+    command: ["java", "-cp", "target/classes:target/dependency/*", "org.example.exchange.distributed.StorageMain"]
+    restart: unless-stopped
+
+  business-2:
+    build: .
+    depends_on:
+      - storage-2
+    environment:
+      SHARD_INDEX: "2"
+      SHARD_COUNT: "3"
+      STORAGE_HOST: "storage-2"
+      STORAGE_PORT: "9102"
+      BUSINESS_PORT: "9101"
+    command: ["java", "-cp", "target/classes:target/dependency/*", "org.example.exchange.distributed.BusinessMain"]
+    restart: unless-stopped
+
+  facade:
+    build: .
+    depends_on:
+      - business-0
+      - business-1
+      - business-2
+    environment:
+      BUSINESS_SHARDS: "business-0,business-1,business-2"
+      BUSINESS_PORT: "9101"
+      FACADE_PORT: "9000"
+    command: ["java", "-cp", "target/classes:target/dependency/*", "org.example.exchange.distributed.FacadeMain"]
+    ports:
+      - "9000/udp"
+    restart: unless-stopped
+
+  tests:
+    build: .
+    depends_on:
+      - facade
+    environment:
+      EXCHANGE_HOST: facade
+      EXCHANGE_PORT: "9000"
+    command: ["mvn", "-B", "test"]
+    profiles: ["tools"]
+
+volumes:
+  shard-0-data:
+  shard-1-data:
+  shard-2-data:
