@@ -210,6 +210,10 @@ public final class InMemoryExchange implements Exchange {
         }
     }
 
+    @Override
+    public void close() {
+    }
+
     private static final class OrderBook {
         private final PriorityQueue<MutableOrder> buys = new PriorityQueue<>(BUY_PRIORITY);
         private final PriorityQueue<MutableOrder> sells = new PriorityQueue<>(SELL_PRIORITY);

@@ -1,9 +1,12 @@
 package org.example.exchange.tests.lab3;
 
+import org.example.exchange.api.Exchange;
 import org.example.exchange.model.CurrencyPair;
 import org.example.exchange.model.Order;
 import org.example.exchange.model.OrderSide;
 import org.example.exchange.model.TradeNotification;
+import org.example.exchange.repository.h2.H2ExchangeRepository;
+import org.example.exchange.service.ExchangeService;
 import org.example.exchange.udp.UdpExchangeClient;
 import org.example.exchange.udp.UdpExchangeServer;
 import org.junit.jupiter.api.Test;
@@ -130,7 +133,9 @@ class UdpExchangeIntegrationTest {
     }
 
     private static UdpExchangeServer startServer(Path database) {
-        UdpExchangeServer server = new UdpExchangeServer(database, 0);
+        Exchange exchange =
+                new ExchangeService(new H2ExchangeRepository(database));
+        UdpExchangeServer server = new UdpExchangeServer(exchange, 0);
         server.start();
         return server;
     }
